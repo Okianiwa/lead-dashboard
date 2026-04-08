@@ -64,7 +64,8 @@ CRMS = {
     },
 }
 
-STATUS_SUCCESS = ["В работе от Игоря", "В работе", "Уехал", "Выплата прошла", "Ждём выплату", "Билеты куплены", "Обработан", "В работе Казань"]
+STATUS_SUCCESS = ["Билеты куплены", "Ждём выплату", "Выплата прошла", "Уехал"]
+STATUS_IN_PROGRESS = ["В работе от Игоря", "В работе", "В работе Казань", "Обработан"]
 STATUS_NDZ = ["НДЗ от Игоря", "ндз2 от Игоря", "ндз Казань"]
 STATUS_TRASH = ["Брак от Игоря"]
 STATUS_RESERVE = ["РЕЗЕРВ"]
@@ -72,6 +73,7 @@ STATUS_THINKING = ["Думает"]
 STATUS_NEW = ["Новые лиды"]
 
 COLOR_SUCCESS = "#2ecc71"
+COLOR_IN_PROGRESS = "#1abc9c"
 COLOR_NDZ = "#f39c12"
 COLOR_TRASH = "#e74c3c"
 COLOR_RESERVE = "#95a5a6"
@@ -79,13 +81,15 @@ COLOR_NEW = "#3498db"
 COLOR_THINKING = "#9b59b6"
 
 TYPE_COLORS = {
-    "Успешный": COLOR_SUCCESS, "НДЗ": COLOR_NDZ, "Брак": COLOR_TRASH,
+    "Успешный": COLOR_SUCCESS, "В процессе": COLOR_IN_PROGRESS,
+    "НДЗ": COLOR_NDZ, "Брак": COLOR_TRASH,
     "Резерв": COLOR_RESERVE, "Новый": COLOR_NEW, "Думает": COLOR_THINKING, "Другое": "#bdc3c7"
 }
 
 
 def classify_status(name):
     if name in STATUS_SUCCESS: return "Успешный"
+    if name in STATUS_IN_PROGRESS: return "В процессе"
     if name in STATUS_NDZ: return "НДЗ"
     if name in STATUS_TRASH: return "Брак"
     if name in STATUS_RESERVE: return "Резерв"
@@ -287,6 +291,7 @@ if date_from and len(trainity_df) > 0:
 
 total = len(deals_df)
 success = len(deals_df[deals_df["Тип"] == "Успешный"])
+in_progress = len(deals_df[deals_df["Тип"] == "В процессе"])
 ndz = len(deals_df[deals_df["Тип"] == "НДЗ"])
 trash = len(deals_df[deals_df["Тип"].isin(["Брак", "Резерв"])])
 new_leads = len(deals_df[deals_df["Тип"] == "Новый"])
@@ -294,13 +299,14 @@ processed = total - new_leads
 conv_total = round(success / total * 100, 1) if total else 0
 conv_processed = round(success / processed * 100, 1) if processed else 0
 
-col1, col2, col3, col4, col5, col6 = st.columns(6)
-col1.metric("Всего сделок", total)
-col2.metric("Обработано", processed, delta=f"{new_leads} новых")
-col3.metric("Успешных", success, delta=f"{conv_total}%")
+col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+col1.metric("Всего", total)
+col2.metric("Успешных", success, delta=f"{conv_processed}%")
+col3.metric("В процессе", in_progress)
 col4.metric("НДЗ", ndz)
 col5.metric("Брак/Резерв", trash)
-col6.metric("Конверсия обраб.", f"{conv_processed}%")
+col6.metric("Новых", new_leads)
+col7.metric("Конверсия общ.", f"{conv_total}%")
 
 st.divider()
 
