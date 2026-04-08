@@ -225,9 +225,15 @@ with st.sidebar:
     crm_name = st.selectbox("CRM", list(CRMS.keys()))
     crm_cfg = CRMS[crm_name]
 
-    use_date_filter = st.checkbox("Фильтр по дате поставки")
-    date_from = None
-    if use_date_filter:
+    # Фильтр по поставке
+    SUPPLY_PRESETS = {
+        "Все данные": None,
+        "Авито-поставка (с 30.01.2026)": datetime(2026, 1, 30).date(),
+        "Своя дата...": "custom",
+    }
+    supply_choice = st.selectbox("Поставка", list(SUPPLY_PRESETS.keys()), index=1)
+    date_from = SUPPLY_PRESETS[supply_choice]
+    if date_from == "custom":
         date_from = st.date_input("С даты", value=datetime.now().date() - timedelta(days=7))
 
     if st.button("🔄 Обновить данные", width="stretch"):
@@ -252,7 +258,7 @@ if len(trainity_df) > 0:
 
 deals_df["Источник"] = deals_df["Телефон"].map(phone_source).fillna("Неизвестен")
 
-# Date filter
+# Date filter by supply
 if date_from and len(trainity_df) > 0:
     cutoff = pd.Timestamp(date_from)
     filtered_phones = set()
@@ -261,8 +267,10 @@ if date_from and len(trainity_df) > 0:
             p = extract_phone(row.get("Телефон", ""))
             if p:
                 filtered_phones.add(p)
+    total_before = len(deals_df)
     deals_df = deals_df[deals_df["Телефон"].isin(filtered_phones)].reset_index(drop=True)
-    st.sidebar.info(f"Поставка с {date_from}: **{len(deals_df)}** сделок")
+    excluded = total_before - len(deals_df)
+    st.sidebar.success(f"**{supply_choice}**\n\n{len(deals_df)} сделок (отсеяно {excluded} старых)")
 
 # ── KPI Row ──
 
