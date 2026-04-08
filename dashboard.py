@@ -64,8 +64,8 @@ CRMS = {
     },
 }
 
-STATUS_SUCCESS = ["В работе от Игоря", "В работе", "Уехал", "Выплата прошла", "Ждём выплату", "Билеты куплены", "Обработан"]
-STATUS_NDZ = ["НДЗ от Игоря", "ндз2 от Игоря"]
+STATUS_SUCCESS = ["В работе от Игоря", "В работе", "Уехал", "Выплата прошла", "Ждём выплату", "Билеты куплены", "Обработан", "В работе Казань"]
+STATUS_NDZ = ["НДЗ от Игоря", "ндз2 от Игоря", "ндз Казань"]
 STATUS_TRASH = ["Брак от Игоря"]
 STATUS_RESERVE = ["РЕЗЕРВ"]
 STATUS_THINKING = ["Думает"]
@@ -96,6 +96,10 @@ def classify_status(name):
 
 def extract_phone(text):
     digits = re.sub(r"[^\d]", "", str(text))
+    if len(digits) == 11 and digits.startswith("8"):
+        digits = "7" + digits[1:]
+    elif len(digits) == 10:
+        digits = "7" + digits
     phones = re.findall(r"7\d{10}", digits)
     return phones[0] if phones else None
 
@@ -384,9 +388,18 @@ with col_left2:
 with col_right2:
     st.subheader("Потери на этапах")
     if processed > 0:
-        stages = ["Всего", "→ Не обработано", "→ НДЗ", "→ Брак", "Успешные"]
-        measures = ["absolute", "relative", "relative", "relative", "total"]
-        vals = [total, -(total - processed), -ndz, -trash, 0]
+        thinking = len(deals_df[deals_df["Тип"] == "Думает"])
+        other = processed - success - ndz - trash - thinking
+        stages = ["Всего", "→ Новые", "→ НДЗ", "→ Брак/Резерв", "→ Думает"]
+        measures = ["absolute", "relative", "relative", "relative", "relative"]
+        vals = [total, -(total - processed), -ndz, -trash, -thinking]
+        if other > 0:
+            stages.append("→ Другое")
+            measures.append("relative")
+            vals.append(-other)
+        stages.append("Успешные")
+        measures.append("total")
+        vals.append(0)
 
         fig_loss = go.Figure(go.Waterfall(
             x=stages, y=vals,
