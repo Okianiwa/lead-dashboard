@@ -262,7 +262,7 @@ if len(trainity_df) > 0:
 
 deals_df["Источник"] = deals_df["Телефон"].map(phone_source).fillna("Неизвестен")
 
-# Date filter by supply
+# Date filter by supply — только лиды из Trainity + фильтр по дате создания сделки
 if date_from and len(trainity_df) > 0:
     cutoff = pd.Timestamp(date_from)
     filtered_phones = set()
@@ -272,7 +272,14 @@ if date_from and len(trainity_df) > 0:
             if p:
                 filtered_phones.add(p)
     total_before = len(deals_df)
-    deals_df = deals_df[deals_df["Телефон"].isin(filtered_phones)].reset_index(drop=True)
+    # Фильтр 1: только телефоны из Trainity
+    deals_df = deals_df[deals_df["Телефон"].isin(filtered_phones)].copy()
+    # Фильтр 2: только сделки, созданные после даты поставки (убирает старые дубли)
+    if "Создано" in deals_df.columns:
+        deals_df = deals_df[
+            deals_df["Создано"].isna() | (deals_df["Создано"] >= cutoff)
+        ]
+    deals_df = deals_df.reset_index(drop=True)
     excluded = total_before - len(deals_df)
     st.sidebar.success(f"**{supply_choice}**\n\n{len(deals_df)} сделок (отсеяно {excluded} старых)")
 
