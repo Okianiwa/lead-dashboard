@@ -35,10 +35,10 @@ def get_secret(key, default=""):
 
 def get_config():
     return {
-        "trainity_token": get_secret("TRAINITY_TOKEN", "guestTokenApiWork12345678910111213141516171819202122232425262728"),
-        "weeek_token_katey": get_secret("WEEEK_TOKEN_KATEY", "811677f3-08da-4128-a0a1-a616bc91cda5"),
-        "weeek_token_split": get_secret("WEEEK_TOKEN_SPLIT", "81c37974-690c-495a-824b-432f08c67e53"),
-        "app_password": get_secret("APP_PASSWORD", ""),
+        "trainity_token": get_secret("TRAINITY_TOKEN"),
+        "weeek_token_katey": get_secret("WEEEK_TOKEN_KATEY"),
+        "weeek_token_split": get_secret("WEEEK_TOKEN_SPLIT"),
+        "app_password": get_secret("APP_PASSWORD"),
     }
 
 
