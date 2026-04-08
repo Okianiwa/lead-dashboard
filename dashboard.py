@@ -277,7 +277,7 @@ if date_from and len(trainity_df) > 0:
     # Фильтр 2: только сделки, созданные после даты поставки (убирает старые дубли)
     if "Создано" in deals_df.columns:
         deals_df = deals_df[
-            deals_df["Создано"].isna() | (deals_df["Создано"] >= pd.Timestamp(cutoff))
+            deals_df["Создано"].isna() | (deals_df["Создано"] >= pd.Timestamp(cutoff, tz="UTC"))
         ]
     deals_df = deals_df.reset_index(drop=True)
     excluded = total_before - len(deals_df)
