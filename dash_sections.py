@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 
 from dash_core import (
     TYPE_COLORS, COLOR_SUCCESS, COLOR_NDZ, COLOR_NEW, classify_status,
-    extract_phone, SLA_WINDOWS_HOURS,
+    extract_phone, SLA_WINDOWS_HOURS, STATUS_MONEY,
 )
 
 
@@ -23,21 +23,27 @@ def render_kpi(deals_df):
     ndz = len(deals_df[deals_df["Тип"] == "НДЗ"])
     trash = len(deals_df[deals_df["Тип"].isin(["Брак", "Резерв"])])
     new_leads = len(deals_df[deals_df["Тип"] == "Новый"])
-    processed = total - new_leads
-    results = success + in_progress  # результативные: деньги + в работе
+    # Деньги = ТОЛЬКО реально закрытые (Выплата прошла). «В сделке» = success-класс
+    # минус деньги (Уехал/Билеты/Ждём — почти, но деньги ещё не пришли).
+    money = len(deals_df[deals_df["Статус"].isin(STATUS_MONEY)])
+    in_deal = max(success - money, 0)
+    results = success + in_progress  # результативные: деньги + в сделке + в работе
     conv_total = round(results / total * 100, 1) if total else 0
-    conv_money = round(success / total * 100, 1) if total else 0
+    conv_money = round(money / total * 100, 1) if total else 0
     ndz_pct = round(ndz / total * 100, 1) if total else 0
     trash_pct = round(trash / total * 100, 1) if total else 0
 
-    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+    col1, col2, col3, col4, col5, col6, col7, col8 = st.columns(8)
     col1.metric("Всего", total)
-    col2.metric("Успешных (деньги)", success, delta=f"{conv_money}%")
-    col3.metric("В работе", in_progress)
-    col4.metric("НДЗ", ndz, delta=f"{ndz_pct}%", delta_color="inverse")
-    col5.metric("Брак/Резерв", trash, delta=f"{trash_pct}%", delta_color="inverse")
-    col6.metric("Новых", new_leads)
-    col7.metric("Конверсия (с в работе)", f"{conv_total}%", help=f"только деньги: {conv_money}%")
+    col2.metric("💰 Деньги", money, delta=f"{conv_money}%",
+                help="Только «Выплата прошла» — реально полученные деньги")
+    col3.metric("🔥 В сделке", in_deal,
+                help="Уехал / Билеты куплены / Ждём выплату — почти деньги, но ещё не пришли")
+    col4.metric("В работе", in_progress, help="Ответили, живой контакт (валидные)")
+    col5.metric("НДЗ", ndz, delta=f"{ndz_pct}%", delta_color="inverse")
+    col6.metric("Брак/Резерв", trash, delta=f"{trash_pct}%", delta_color="inverse")
+    col7.metric("Новых", new_leads)
+    col8.metric("Конверсия (с в работе)", f"{conv_total}%", help=f"только деньги: {conv_money}%")
 
 
 def render_type_status_charts(deals_df):

@@ -21,6 +21,16 @@ STATUS_TRASH = ["Брак от Игоря", "РЕЗЕРВ"]
 STATUS_THINKING = ["Думает"]
 STATUS_NEW = ["Новые лиды"]
 
+# «Закрытые деньги» — реально полученные. Метрика «Деньги» считается ТОЛЬКО по
+# ним. Остальные success-статусы (Уехал/Билеты куплены/Ждём выплату) — это «в
+# сделке» (почти, но деньги ещё не пришли), их в «деньги» включать нельзя.
+STATUS_MONEY = ["Выплата прошла"]
+
+
+def is_money(status_name):
+    """True только для реально закрытых денег (Выплата прошла)."""
+    return (status_name or "").strip() in STATUS_MONEY
+
 # class key -> русская метка типа (для отчётов/Excel)
 CLASS_LABELS = {
     "success": "Успешный",
@@ -125,6 +135,47 @@ def source_from_deal(title="", description=""):
         src = m.group(1).strip()
         if src and src.lower() != "неизвестен":
             return src
+    return None
+
+
+# Домен сайта-донора зашит в сделку двумя способами (см. скрины Weeek):
+#   s1gnal.sites  -> "Источник: site.ru"            (домен прямо в Источнике)
+#   s1gnal.phones -> "URL донора: https://site/..." (домен в URL донора)
+_URL_DONOR_RE = re.compile(r"URL\s*донора:\s*(\S+)", re.IGNORECASE)
+_HOST_RE = re.compile(r"^(?:https?://)?(?:www\.)?([^/\s:?#]+)", re.IGNORECASE)
+
+
+def _to_domain(s):
+    """Из URL или строки достаёт домен. None если не похоже на домен (телефон/пусто)."""
+    s = str(s or "").strip().strip('"\'<>')
+    if not s or s.lower() in ("nan", "none", "неизвестен"):
+        return None
+    m = _HOST_RE.match(s)
+    if not m:
+        return None
+    host = m.group(1).lower().rstrip(".")
+    # домен = есть точка И хотя бы один не-цифровой символ (отсекаем телефоны)
+    if "." not in host or not re.search(r"[^\d.]", host):
+        return None
+    return host
+
+
+def site_from_deal(title="", description=""):
+    """Домен сайта-донора из сделки. None если не определить.
+
+    Сначала пробуем 'URL донора:' (s1gnal.phones), потом 'Источник:' (s1gnal.sites).
+    """
+    d = str(description or "")
+    m = _URL_DONOR_RE.search(d)
+    if m:
+        dom = _to_domain(m.group(1))
+        if dom:
+            return dom
+    m = _SRC_DESC_RE.search(d)
+    if m:
+        dom = _to_domain(m.group(1).split("|")[0])
+        if dom:
+            return dom
     return None
 
 

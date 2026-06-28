@@ -22,7 +22,8 @@ sys.path.insert(0, _HERE)
 
 from status_classification import (  # noqa: E402
     classify_status as _classify_key, normalize_phone, extract_phone,  # noqa: F401
-    source_from_deal, dedupe_deals, SLA_WINDOWS_HOURS, POSITIVE_CLASSES,  # noqa: F401
+    source_from_deal, site_from_deal, dedupe_deals, SLA_WINDOWS_HOURS,  # noqa: F401
+    POSITIVE_CLASSES, STATUS_MONEY, is_money,  # noqa: F401
 )
 
 WEEEK_BASE = "https://api.weeek.net/public/v1"
@@ -169,6 +170,8 @@ def build_deals_df(deals):
             "Класс": _classify_key(d.get("_status", "")),
             # Источник берём из самой сделки (title-префикс / 'Источник:' в descr)
             "Источник": source_from_deal(title, d.get("description", "") or ""),
+            # Сайт-донор (домен): для анализа качества лидов по сайтам s1gnal
+            "Сайт": site_from_deal(title, d.get("description", "") or ""),
             "Создано": dt,
         })
     return pd.DataFrame(rows)
@@ -269,3 +272,72 @@ def render_combined(selected_names=None):
     with col_r:
         st.subheader("По воронкам")
         st.dataframe(per_df, width="stretch", hide_index=True, height=380)
+
+    render_donor_sites(unique)
+
+
+def render_donor_sites(df):
+    """Рейтинг сайтов-доноров по качеству лидов (для решения «менять/оставить»).
+
+    Группировка по домену сайта, откуда s1gnal взял номер. Лиды без сайта
+    (ГЦК/ручные) исключаются — секция автоматически про s1gnal-сайты.
+    df должен быть уже дедуплен по номеру (как unique в render_combined).
+    """
+    st.markdown("---")
+    st.subheader("🌐 Сайты-доноры: качество лидов")
+    st.caption(
+        "Группировка по сайту, откуда s1gnal взял номер. Лиды без сайта "
+        "(ГЦК/ручные) исключены. «Деньги» = только Выплата прошла; «Результативные» "
+        "= деньги + в сделке + в работе (кто ответил)."
+    )
+    if "Сайт" not in df.columns:
+        st.info("Нет колонки «Сайт» в данных.")
+        return
+    sub = df[df["Сайт"].notna()].copy()
+    if len(sub) == 0:
+        st.info("Нет лидов с распознанным сайтом-донором.")
+        return
+
+    sub["_money"] = sub["Статус"].isin(STATUS_MONEY)
+    sub["_result"] = sub["Класс"].isin(POSITIVE_CLASSES)
+    sub["_ndz"] = sub["Класс"] == "ndz"
+    sub["_trash"] = sub["Класс"] == "trash"
+
+    g = sub.groupby("Сайт").agg(
+        Лидов=("Сайт", "size"),
+        Деньги=("_money", "sum"),
+        Результативных=("_result", "sum"),
+        НДЗ=("_ndz", "sum"),
+        Брак=("_trash", "sum"),
+    ).reset_index()
+    g["Результат %"] = (g["Результативных"] / g["Лидов"] * 100).round(1)
+    g["Брак+НДЗ %"] = ((g["НДЗ"] + g["Брак"]) / g["Лидов"] * 100).round(1)
+
+    max_leads = int(g["Лидов"].max())
+    default_min = min(5, max_leads)
+    min_leads = st.slider(
+        "Минимум лидов на сайт (отсекает мелочь, где % недостоверен)",
+        1, min(max_leads, 50), default_min,
+    )
+    gf = g[g["Лидов"] >= min_leads].sort_values("Результат %", ascending=False)
+    st.caption(f"Сайтов всего: {len(g)} · с ≥{min_leads} лидов: {len(gf)}")
+
+    st.dataframe(
+        gf, width="stretch", hide_index=True, height=520,
+        column_order=["Сайт", "Лидов", "Деньги", "Результативных",
+                      "Результат %", "НДЗ", "Брак", "Брак+НДЗ %"],
+    )
+
+    if len(gf):
+        chart = gf.sort_values("Результат %", ascending=True).tail(25)
+        fig = go.Figure()
+        fig.add_trace(go.Bar(y=chart["Сайт"], x=chart["Результат %"], orientation="h",
+                             name="Результат %", marker_color=COLOR_IN_PROGRESS))
+        fig.add_trace(go.Bar(y=chart["Сайт"], x=chart["Брак+НДЗ %"], orientation="h",
+                             name="Брак+НДЗ %", marker_color=COLOR_TRASH))
+        fig.update_layout(barmode="group", height=max(400, len(chart) * 26),
+                          margin=dict(l=10, r=10, t=30, b=10),
+                          paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                          font=dict(color="#e2e8f0"), xaxis=dict(gridcolor="#2d3748", title="%"),
+                          legend=dict(orientation="h", y=1.05))
+        st.plotly_chart(fig, width="stretch")
