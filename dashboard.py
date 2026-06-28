@@ -52,7 +52,14 @@ st.title("📊 Lead Analytics Dashboard")
 
 with st.sidebar:
     st.header("Настройки")
-    show_combined = st.checkbox("📊 Общая сводка (все воронки)")
+    show_combined = st.checkbox("📊 Общая сводка по воронкам")
+    if show_combined:
+        combined_funnels = st.multiselect(
+            "Воронки для сводки",
+            list(CRMS.keys()),
+            default=list(CRMS.keys()),
+            help="Кросс-сводка с дедупом по номеру между выбранными воронками",
+        )
     crm_name = st.selectbox("CRM", list(CRMS.keys()))
     crm_cfg = CRMS[crm_name]
 
@@ -69,9 +76,12 @@ with st.sidebar:
     if st.button("🔄 Обновить данные", width="stretch"):
         st.cache_data.clear()
 
-# Общая сводка по всем воронкам — отдельный экран
+# Общая сводка по выбранным воронкам — отдельный экран
 if show_combined:
-    render_combined()
+    if not combined_funnels:
+        st.warning("Выбери хотя бы одну воронку для сводки.")
+        st.stop()
+    render_combined(combined_funnels)
     st.stop()
 
 # ── Load data ──

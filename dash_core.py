@@ -198,12 +198,18 @@ def check_password():
     return False
 
 
-def render_combined():
-    """Общая кросс-воронковая сводка по ВСЕМ воронкам (глобальный дедуп)."""
-    st.title("📊 Общая сводка по всем воронкам")
+def render_combined(selected_names=None):
+    """Кросс-воронковая сводка с глобальным дедупом по номеру.
+
+    selected_names: список названий воронок из CRMS. None/пусто → все воронки.
+    """
+    names = [n for n in (selected_names or CRMS) if n in CRMS]
+    st.title("📊 Общая сводка по воронкам")
+    st.caption("Воронки: " + ", ".join(names))
     frames = []
-    with st.spinner("Загрузка всех воронок..."):
-        for name, cfg in CRMS.items():
+    with st.spinner("Загрузка воронок..."):
+        for name in names:
+            cfg = CRMS[name]
             df = dedupe_deals(build_deals_df(load_deals(cfg["funnel_id"], cfg["token"])))
             df = df[df["Телефон"].notna()].copy()
             if len(df) == 0:
@@ -231,7 +237,7 @@ def render_combined():
     c4.metric("В неск. воронках", overlap, help="один номер в >1 воронке (race-дубли)")
 
     per = []
-    for name in CRMS:
+    for name in names:
         g = allf[allf["Воронка"] == name]
         if len(g) == 0:
             continue
